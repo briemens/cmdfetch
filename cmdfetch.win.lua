@@ -3,14 +3,14 @@
 --[[
 local                 usedLines = {"Name","Kernel","OS","Memory","Uptime",
                                    "Visual Style","Resolution","CPU","GPU","Disk Space",
-                                   "bbLean Theme","Users","Terminal",
-                                   "Font","WM","Shell","Processes"
-                                   }
+                                   "bbLean Theme","Users","Now Playing","Terminal",
+                                   "MoBo","Font","WM","Shell","Processes",
+                                   "Music Player","IRC Client"}
 ]]
                       usedLines = {"Name","Kernel","OS","Memory","Uptime",
                                    "Visual Style","Resolution","CPU","GPU","Disk Space",
-                                   "bbLean Theme","Terminal","Font",
-                                   "WM","Shell"}
+                                   "bbLean Theme","Now Playing","Terminal","Font",
+                                   "WM","Shell","Music Player","IRC Client"}
 local               fhost,fport = "localhost","3333"  --  Host and port for foobar
 local               mhost,mport = "localhost","6600"  --  Host and port for MPD
 local            dominantPlayer = "foobar"  --  Change to "mpd" to check for MPD first
@@ -218,7 +218,7 @@ end
 
 --//    Default logo to Windows 8 logo if the user is using Windows 8    //--
 
-local OS = getGood("2>nul wmic os get caption")
+local OS = getGood("wmic os get caption")
 if OS:find("2012") or OS:find("8") then
     logo = "windows8"
 end
@@ -300,7 +300,7 @@ lineFunctions["Name"] = function()
 end
 
 lineFunctions["OS"] = function()
-    architecture = getGood("2>nul wmic OS get OSArchitecture")
+    architecture = getGood("wmic OS get OSArchitecture")
     local out = OS.." "..architecture
     if fancyData then
         for i = 1,3 do
@@ -312,7 +312,7 @@ end
 
 lineFunctions["Kernel"] = function()
     kernelOS = os.getenv("OS")
-    kernel = getGood("2>nul wmic os get version")
+    kernel = getGood("wmic os get version")
     local out = kernelOS.." "..kernel
     if fancyData then
         for i = 1,3 do
@@ -323,7 +323,7 @@ lineFunctions["Kernel"] = function()
 end
 
 lineFunctions["Uptime"] = function()
-    local lastBootUp = lineFromFile(io.popen("2>nul wmic os get lastbootuptime"),2)
+    local lastBootUp = lineFromFile(io.popen("wmic os get lastbootuptime"),2)
     local pattern="(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)"
     local year,month,day,hour,min,sec=(lastBootUp):match(pattern)
     time1 = os.time({
@@ -358,8 +358,8 @@ lineFunctions["Uptime"] = function()
 end
 
 lineFunctions["Memory"] = function()
-    local ramSize = getGood("2>nul wmic os get totalvisiblememorysize")
-    local ramFree = getGood("2>nul wmic os get freephysicalmemory")
+    local ramSize = getGood("wmic os get totalvisiblememorysize")
+    local ramFree = getGood("wmic os get freephysicalmemory")
     ramUsed = ramSize - ramFree
     ramUsed = math.floor((tonumber(ramUsed)/1024)+.5)
     ramSize = math.floor((tonumber(ramSize)/1024)+.5)
@@ -378,7 +378,44 @@ local slider
 
 
 lineFunctions["Visual Style"] = function()
-    return "Windows Classic"
+    local theme
+    local dir = {"HKCU","Software","Microsoft","Windows","CurrentVersion","ThemeManager"}
+    local stringToMatch1 = "[%w%_]+%s+[%w%_]+%s+([%w%_%-%s%%%p]+)"
+    local stringToMatch2 = "([%:%p%w%s%\\]+%\\)([%w%_%-%s%%%p]+)"
+    local regKey = "reg query "..table.concat(dir,"\\").." /v DllName"
+    local themeFileName = lineFromFile(io.popen("cmd /c \"2>nul "..regKey.."\""),3)
+    if not themeFileName then
+        --  There isn't a visual style found, just use the theme file
+        --  Often in the case of Windows Classic
+        dir[6] = "Themes"
+        local regKey = "reg query "..table.concat(dir,"\\").." /v CurrentTheme"
+        local themeName = lineFromFile(io.popen("cmd /c \"2>nul "..regKey.."\""),3)
+        themeName = themeName:match(stringToMatch1)
+        pathToTheme,themeName = themeName:match(stringToMatch2)
+        --  This is more difficult, currently reads the .theme file, if it is
+        --  determined that it is Windows Classic, use "Windows Classic",
+        --  otherwise trim the file extension from the theme file and use that.
+        local command = "cmd /c type \""..pathToTheme..themeName.."\""
+        for line in io.popen(command):lines() do
+            found,result = line:find("ColorStyle")
+            if found then
+                if line:find("Classic") then
+                    theme = "Windows Classic"
+                else
+                    theme = themeName:match("([%s%w]+)")
+                    if theme:lower() == "classic" then
+                        theme = "Windows Classic"
+                    end
+                end
+            end
+        end
+    else
+        local themeFileName = themeFileName:match(stringToMatch1)
+        pathToTheme,themeName = themeFileName:match(stringToMatch2)
+        theme = themeName:match("([%p%w%s%_%$-]+).msstyle")
+        --  Trimming the file extension should be fine for this.
+    end
+    return theme
 end
 
 lineFunctions["bbLean Theme"] = function()
@@ -389,7 +426,7 @@ lineFunctions["bbLean Theme"] = function()
         if task == "blackbox" then
             --  Check for bbLean
             local drive = os.getenv("HOMEDRIVE")
-            local dir = "cmd /c dir /b "..drive.."\\bbLean "
+            local dir = "2>&1 cmd /c dir /b "..drive.."\\bbLean "
             if os.getenv("TERM") == "cygwin" then
                 dir = dir:gsub("\\","\\\\")
             end
@@ -416,8 +453,8 @@ lineFunctions["bbLean Theme"] = function()
 end
 
 lineFunctions["Resolution"] = function()
-    local height,heightLines = io.popen("2>nul wmic desktopmonitor get screenheight"),{}
-    local width,widthLines = io.popen("2>nul wmic desktopmonitor get screenwidth"),{}
+    local height,heightLines = io.popen("wmic desktopmonitor get screenheight"),{}
+    local width,widthLines = io.popen("wmic desktopmonitor get screenwidth"),{}
     local monitorHeights,monitorWidths = {},{}
     for line in height:lines() do
         table.insert(heightLines,line)
@@ -445,14 +482,14 @@ lineFunctions["Resolution"] = function()
 end
 
 lineFunctions["CPU"] = function()
-    local cpu,cpuLine = io.popen("2>nul wmic cpu get name"),""
+    local cpu,cpuLine = io.popen("wmic cpu get name"),""
     for line in cpu:lines() do
         if line and not line:lower():find("name") and line:find("%w") then
             cpuLine = cpuLine..line:gsub("%s+"," "):gsub("%([RTM]+%)","").."\n"
         end
     end
     if useCPUUsage then
-        local usage = io.popen("2>nul wmic cpu get loadpercentage")
+        local usage = io.popen("wmic cpu get loadpercentage")
         for line in usage:lines() do
             if line:match("%d+") then
                 local usage = colorCap(tonumber(line:match("%d+")),100)..line:match("%d+").."%"
@@ -467,8 +504,9 @@ lineFunctions["CPU"] = function()
         return cpuLine
     end
 end
+
 lineFunctions["GPU"] = function()
-    local gpu,gpuLine = io.popen("2>nul wmic path Win32_VideoController get caption"),""
+    local gpu,gpuLine = io.popen("wmic path Win32_VideoController get caption"),""
     for line in gpu:lines() do
         if line and not line:lower():find("caption") and line:find("%w") then
             gpuLine = gpuLine .. line:gsub("%s+"," "):gsub("%([RTM]+%)","") .. "\n"
@@ -478,8 +516,8 @@ lineFunctions["GPU"] = function()
 end
 
 lineFunctions["Disk Space"] = function()
-    local space = io.popen("2>nul wmic logicaldisk get freespace")
-    local size = io.popen("2>nul wmic logicaldisk get size")
+    local space = io.popen("wmic logicaldisk get freespace")
+    local size = io.popen("wmic logicaldisk get size")
     local spaceLines,sizeLines = {},{}
     local line = ""
     for line in space:lines() do
@@ -567,7 +605,7 @@ lineFunctions["Users"] = function()
 end
 
 lineFunctions["MoBo"] = function()
-    return getGood("2>nul wmic csproduct get name")
+    return getGood("wmic csproduct get name")
 end
 
 lineFunctions["Font"] = function()

@@ -2,14 +2,14 @@
 --[[
 local                 usedLines = {"Name","Kernel","OS","Memory","Uptime",
                                    "Visual Style","Resolution","CPU","GPU","Disk Space",
-                                   "bbLean Theme","Users","Now Playing","Terminal",
-                                   "MoBo","Font","WM","Shell","Processes",
-                                   "Music Player","IRC Client"}
+                                   "bbLean Theme","Users","Terminal",
+                                   "Font","WM","Shell","Processes"
+                                   }
 ]]
                       usedLines = {"Name","Kernel","OS","Memory","Uptime",
                                    "Visual Style","Resolution","CPU","GPU","Disk Space",
-                                   "bbLean Theme","Now Playing","Terminal","Font",
-                                   "WM","Shell","Music Player","IRC Client"}
+                                   "bbLean Theme","Terminal","Font",
+                                   "WM","Shell"}
 local               fhost,fport = "localhost","3333"  --  Host and port for foobar
 local               mhost,mport = "localhost","6600"  --  Host and port for MPD
 local            dominantPlayer = "foobar"  --  Change to "mpd" to check for MPD first
@@ -217,7 +217,7 @@ end
 
 --//    Default logo to Windows 8 logo if the user is using Windows 8    //--
 
-local OS = getGood("wmic os get caption")
+local OS = getGood("wmict::::tt333EEF @EEEEEEttttt33F  Visual Style os get caption")
 if OS:find("2012") or OS:find("8") then
     logo = "windows8"
 end
@@ -377,44 +377,7 @@ local slider
 
 
 lineFunctions["Visual Style"] = function()
-    local theme
-    local dir = {"HKCU","Software","Microsoft","Windows","CurrentVersion","ThemeManager"}
-    local stringToMatch1 = "[%w%_]+%s+[%w%_]+%s+([%w%_%-%s%%%p]+)"
-    local stringToMatch2 = "([%:%p%w%s%\\]+%\\)([%w%_%-%s%%%p]+)"
-    local regKey = "reg query "..table.concat(dir,"\\").." /v DllName"
-    local themeFileName = lineFromFile(io.popen("cmd /c \"2>nul "..regKey.."\""),3)
-    if not themeFileName then
-        --  There isn't a visual style found, just use the theme file
-        --  Often in the case of Windows Classic
-        dir[6] = "Themes"
-        local regKey = "reg query "..table.concat(dir,"\\").." /v CurrentTheme"
-        local themeName = lineFromFile(io.popen("cmd /c \"2>nul "..regKey.."\""),3)
-        themeName = themeName:match(stringToMatch1)
-        pathToTheme,themeName = themeName:match(stringToMatch2)
-        --  This is more difficult, currently reads the .theme file, if it is
-        --  determined that it is Windows Classic, use "Windows Classic",
-        --  otherwise trim the file extension from the theme file and use that.
-        local command = "cmd /c type \""..pathToTheme..themeName.."\""
-        for line in io.popen(command):lines() do
-            found,result = line:find("ColorStyle")
-            if found then
-                if line:find("Classic") then
-                    theme = "Windows Classic"
-                else
-                    theme = themeName:match("([%s%w]+)")
-                    if theme:lower() == "classic" then
-                        theme = "Windows Classic"
-                    end
-                end
-            end
-        end
-    else
-        local themeFileName = themeFileName:match(stringToMatch1)
-        pathToTheme,themeName = themeFileName:match(stringToMatch2)
-        theme = themeName:match("([%p%w%s%_%$-]+).msstyle")
-        --  Trimming the file extension should be fine for this.
-    end
-    return theme
+    return "Windows Classic"
 end
 
 lineFunctions["bbLean Theme"] = function()
@@ -503,7 +466,6 @@ lineFunctions["CPU"] = function()
         return cpuLine
     end
 end
-
 lineFunctions["GPU"] = function()
     local gpu,gpuLine = io.popen("wmic path Win32_VideoController get caption"),""
     for line in gpu:lines() do
@@ -912,6 +874,7 @@ for i = 1,#usedLines do
 end
 local dataLines,logoLines = {},{}
 for i = 1,#usedLines do
+    print(usedLines[i])
     local info = (lineFunctions[usedLines[i]]()):gsub("[^\032\027%w%p_\n]","") or "hi"
     local firstLine = true
     for line in info:gmatch("[^\n]+") do
